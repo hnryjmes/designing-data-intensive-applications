@@ -337,3 +337,295 @@ Summary
 
 ### 3 Storage and Retrieval
 
+"On the most fundamental level, a database needs to do two things: when you give it some data, it should store the data, and when you ask it again later, it should give the data back to you."
+
+"You’re probably not going to implement your own storage engine from scratch, but you do need to select a storage engine that is appropriate for your application, from the many that are available."
+
+"We will examine two families of storage engines: log-structured storage engines, and page-oriented storage engines such as B-trees."
+
+Data Structures That Power Your Database
+
+"Consider the world’s simplest database, implemented as two Bash functions:"
+
+```bash
+#!/bin/bash
+    db_set () {
+        echo "$1,$2" >> database
+}
+    db_get () {
+        grep "^$1," database | sed -e "s/^$1,//" | tail -n 1
+}
+```
+
+"These two functions implement a key-value store."
+
+"The underlying storage format is very simple: a text file where each line contains a key-value pair, separated by a comma (roughly like a CSV file, ignoring escaping issues)."
+
+"Our `db_set` function actually has pretty good performance for something that is so simple, because appending to a file is generally very efficient."
+
+"Similarly to what `db_set` does, many databases internally use a log, which is an append-only data file."
+
+"Real databases have more issues to deal with (such as concurrency control, reclaiming disk space so that the log doesn’t grow forever, and handling errors and partially written records), but the basic principle is the same."
+
+"In algorithmic terms, the cost of a lookup is O(n): if you double the number of records n in your database, a lookup takes twice as long."
+
+"An index is an additional structure that is derived from the primary data."
+
+Hash Indexes
+
+"Key-value stores are quite similar to the dictionary type that you can find in most programming languages, and which is usually implemented as a hash map (hash table)."
+
+"Whenever you append a new key-value pair to the file, you also update the hash map to reflect the offset of the data you just wrote (this works both for inserting new keys and for updating existing keys)."
+
+"When you want to look up a value, use the hash map to find the offset in the data file, seek to that location, and read the value."
+
+"As described so far, we only ever append to a file — so how do we avoid eventually running out of disk space?"
+
+"A good solution is to break the log into segments of a certain size by closing a segment file when it reaches a certain size, and making subsequent writes to a new segment file."
+
+"Segments are never modified after they have been written, so the merged segment is written to a new file."
+
+"The merging and compaction of frozen segments can be done in a background thread, and while it is going on, we can still continue to serve read and write requests as normal, using the old segment files."
+
+"Lots of detail goes into making this simple idea work in practice."
+
+File format
+
+"It’s faster and simpler to use a binary format that first encodes the length of a string in bytes, followed by the raw string (without need for escaping)."
+
+Deleting records
+
+"When log segments are merged, the tombstone tells the merging process to discard any previous values for the deleted key."
+
+Crash recovery
+
+"In principle, you can restore each segment’s hash map by reading the entire segment file from beginning to end and noting the offset of the most recent value for every key as you go along."
+
+Partially written records
+
+"The database may crash at any time, including halfway through appending a record to the log."
+
+Concurrency control
+
+"Data file segments are append-only and otherwise immutable, so they can be read concurrently by multiple threads."
+
+"An append-only log seems wasteful at first glance: why don’t you update the file in place, overwriting the old value with the new value?"
+
+"Appending and segment merging are sequential write operations, which are generally much faster than random writes, especially on magnetic spinning-disk hard drives."
+
+"Concurrency and crash recovery are much simpler if segment files are append-only or immutable."
+
+"Merging old segments avoids the problem of data files getting fragmented over time."
+
+"The hash table must fit in memory, so if you have a very large number of keys, you’re out of luck."
+
+SSTables and LSM-Trees
+
+"Now we can make a simple change to the format of our segment files: we require that the sequence of key-value pairs is sorted by key."
+
+"We call this format Sorted String Table, or SSTable for short."
+
+"Merging segments is simple and efficient, even if the files are bigger than the available memory."
+
+"In order to find a particular key in the file, you no longer need to keep an index of all the keys in memory."
+
+"However, you do know the offsets for the keys handbag and handsome, and because of the sorting you know that handiwork must appear between those two."
+
+"This means you can jump to the offset for handbag and scan from there until you find handiwork (or not, if the key is not present in the file)."
+
+"You still need an in-memory index to tell you the offsets for some of the keys, but it can be sparse: one key for every few kilobytes of segment file is sufficient, because a few kilobytes can be scanned very quickly."
+
+Constructing and maintaining SSTables
+
+"It only suffers from one problem: if the database crashes, the most recent writes (which are in the memtable but not yet written out to disk) are lost."
+
+"In order to avoid that problem, we can keep a separate log on disk to which every write is immediately appended, just like in the previous section."
+
+"That log is not in sorted order, but that doesn’t matter, because its only purpose is to restore the memtable after a crash."
+
+"Every time the memtable is written out to an SSTable, the corresponding log can be discarded."
+
+Making an LSM-tree out of SSTables
+
+"Originally this indexing structure was described by Patrick O’Neil et al. under the name Log-Structured Merge-Tree (or LSM-Tree), building on earlier work on log-structured filesystems."
+
+"Storage engines that are based on this principle of merging and compacting sorted files are often called LSM storage engines."
+
+Performance optimizations
+
+"A Bloom filter is a memory-efficient data structure for approximating the contents of a set."
+
+B-Trees
+
+"The log-structured indexes we saw earlier break the database down into variable-size segments, typically several megabytes or more in size, and always write a segment sequentially."
+
+"By contrast, B-trees break the database down into fixed-size blocks or pages, traditionally 4 KB in size (sometimes bigger), and read or write one page at a time."
+
+"This design corresponds more closely to the underlying hardware, as disks are also arranged in fixed-size blocks."
+
+"The number of references to child pages in one page of the B-tree is called the branching factor."
+
+"In practice, the branching factor depends on the amount of space required to store the page references and the range boundaries, but typically it is several hundred."
+
+"This algorithm ensures that the tree remains balanced: a B-tree with n keys always has a depth of O(log n)."
+
+Making B-trees reliable
+
+"An additional complication of updating pages in place is that careful concurrency control is required if multiple threads are going to access the B-tree at the same time — otherwise a thread may see the tree in an inconsistent state."
+
+"This is typically done by protecting the tree’s data structures with latches (lightweight locks)."
+
+B-tree optimizations
+
+"Many B- tree implementations therefore try to lay out the tree so that leaf pages appear in sequential order on disk."
+
+Comparing B-Trees and LSM-Trees
+
+"Even though B-tree implementations are generally more mature than LSM-tree implementations, LSM-trees are also interesting due to their performance characteristics."
+
+Advantages of LSM-trees
+
+"In write-heavy applications, the performance bottleneck might be the rate at which the database can write to disk."
+
+"In this case, write amplification has a direct performance cost: the more that a storage engine writes to disk, the fewer writes per second it can handle within the available disk bandwidth."
+
+Downsides of LSM-trees
+
+"An advantage of B-trees is that each key exists in exactly one place in the index, whereas a log-structured storage engine may have multiple copies of the same key in different segments."
+
+Other Indexing Structures
+
+"A primary key uniquely identifies one row in a relational table, or one document in a document database, or one vertex in a graph database."
+
+"In relational databases, you can create several secondary indexes on the same table using the CREATE INDEX command, and they are often crucial for performing joins efficiently."
+
+Storing values within the index
+
+"The key in an index is the thing that queries search for, but the value can be one of two things: it could be the actual row (document, vertex) in question, or it could be a reference to the row stored elsewhere."
+
+"A compromise between a clustered index (storing all row data within the index) and a nonclustered index (storing only references to the data within the index) is known as a covering index or index with included columns, which stores some of a table’s columns within the index."
+
+Multi-column indexes
+
+"The most common type of multi-column index is called a concatenated index, which simply combines several fields into one key by appending one column to another (the index definition specifies in which order the fields are concatenated)."
+
+"Multi-dimensional indexes are a more general way of querying several columns at once, which is particularly important for geospatial data."
+
+Full-text search and fuzzy indexes
+
+"What they don’t allow you to do is search for similar keys, such as misspelled words."
+
+"For example, full-text search engines commonly allow a search for one word to be expanded to include synonyms of the word, to ignore grammatical variations of words, and to search for occurrences of words near each other in the same document, and support various other features that depend on linguistic analysis of the text."
+
+Keeping everything in memory
+
+"However, we tolerate this awkwardness because disks have two significant advantages: they are durable (their contents are not lost if the power is turned off), and they have a lower cost per gigabyte than RAM."
+
+"Counterintuitively, the performance advantage of in-memory databases is not due to the fact that they don’t need to read from disk."
+
+"Rather, they can be faster because they can avoid the overheads of encoding in-memory data structures in a form that can be written to disk."
+
+Transaction Processing or Analytics?
+
+"In the early days of business data processing, a write to the database typically corresponded to a commercial transaction taking place: making a sale, placing an order with a supplier, paying an employee’s salary, etc."
+
+"A transaction needn’t necessarily have ACID (atomicity, consistency, isolation, and durability) properties."
+
+"Transaction processing just means allowing clients to make low-latency reads and writes — as opposed to batch processing jobs, which only run periodically (for example, once per day)."
+
+"Even though databases started being used for many different kinds of data — comments on blog posts, actions in a game, contacts in an address book, etc. — the basic access pattern remained similar to processing business transactions."
+
+"Usually an analytic query needs to scan over a huge number of records, only reading a few columns per record, and calculates aggregate statistics (such as count, sum, or average) rather than returning the raw data to the user."
+
+"At first, the same databases were used for both transaction processing and analytic queries."
+
+"SQL turned out to be quite flexible in this regard: it works well for OLTP-type queries as well as OLAP-type queries."
+
+"This separate database was called a data warehouse."
+
+"Nevertheless, in the late 1980s and early 1990s, there was a trend for companies to stop using their OLTP systems for analytics purposes, and to run the analytics on a separate database instead."
+
+Data Warehousing
+
+"The data warehouse contains a read-only copy of the data in all the various OLTP systems in the company."
+
+"Data is extracted from OLTP databases (using either a periodic data dump or a continuous stream of updates), transformed into an analysis-friendly schema, cleaned up, and then loaded into the data warehouse."
+
+"This process of getting data into the warehouse is known as Extract–Transform–Load (ETL)"
+
+"A big advantage of using a separate data warehouse, rather than querying OLTP systems directly for analytics, is that the data warehouse can be optimized for analytic access patterns."
+
+"It turns out that the indexing algorithms discussed in the first half of this chapter work well for OLTP, but are not very good at answering analytic queries."
+
+The divergence between OLTP databases and data warehouses
+
+"Some databases, such as Microsoft SQL Server and SAP HANA, have support for transaction processing and data warehousing in the same product."
+
+"Amazon RedShift is a hosted version of ParAccel."
+
+"More recently, a plethora of open source SQL-on- Hadoop projects have emerged; they are young but aiming to compete with commercial data warehouse systems."
+
+"These include Apache Hive, Spark SQL, Cloudera Impala, Facebook Presto, Apache Tajo, and Apache Drill."
+
+"Some of them are based on ideas from Google’s Dremel."
+
+Stars and Snowflakes: Schemas for Analytics
+
+"Other columns in the fact table are foreign key references to other tables, called dimension tables."
+
+"As each row in the fact table represents an event, the dimensions represent the who, what, where, when, how, and why of the event."
+
+"A variation of this template is known as the snowflake schema, where dimensions are further broken down into subdimensions."
+
+Column-Oriented Storage
+
+"Although fact tables are often over 100 columns wide, a typical data warehouse query only accesses 4 or 5 of them at one time ("`SELECT *`" queries are rarely needed for analytics)."
+
+"The idea behind column-oriented storage is simple: don’t store all the values from one row together, but store all the values from each column together instead."
+
+Column Compression
+
+"Bitmap indexes such as these are very well suited for the kinds of queries that are common in a data warehouse."
+
+Column-oriented storage and column families
+
+"Thus, the Bigtable model is still mostly row-oriented."
+
+Memory bandwidth and vectorized processing
+
+"Besides reducing the volume of data that needs to be loaded from disk, column- oriented storage layouts are also good for making efficient use of CPU cycles."
+
+Sort Order in Column Storage
+
+"But having the first few columns sorted is still a win overall."
+
+Several different sort orders
+
+"Data needs to be replicated to multiple machines anyway, so that you don’t lose data if one machine fails."
+
+"Having multiple sort orders in a column-oriented store is a bit similar to having multiple secondary indexes in a row-oriented store."
+
+Writing to Column-Oriented Storage
+
+"These optimizations make sense in data warehouses, because most of the load consists of large read-only queries run by analysts."
+
+Aggregation: Data Cubes and Materialized Views
+
+"Not every data warehouse is necessarily a column store: traditional row-oriented databases and a few other architectures are also used."
+
+"The advantage of a materialized data cube is that certain queries become very fast because they have effectively been precomputed."
+
+Summary
+
+"On a high level, we saw that storage engines fall into two broad categories: those optimized for transaction processing (OLTP), and those optimized for analytics (OLAP)."
+
+"OLTP systems are typically user-facing, which means that they may see a huge volume of requests."
+
+"Data warehouses and similar analytic systems are less well known, because they are primarily used by business analysts, not by end users."
+
+"As an application developer, if you’re armed with this knowledge about the internals of storage engines, you are in a much better position to know which tool is best suited for your particular application."
+
+"If you need to adjust a database’s tuning parameters, this understanding allows you to imagine what effect a higher or a lower value may have."
+
+### 4 Encoding and Evolution
+
