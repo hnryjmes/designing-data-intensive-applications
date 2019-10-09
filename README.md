@@ -629,3 +629,209 @@ Summary
 
 ### 4 Encoding and Evolution
 
+"In most cases, a change to an application’s features also requires a change to data that it stores: perhaps a new field or record type needs to be captured, or perhaps existing data needs to be presented in a new way."
+
+"With server-side applications you may want to perform a rolling upgrade (also known as a staged rollout), deploying the new version to a few nodes at a time, checking whether the new version is running smoothly, and gradually working your way through all the nodes."
+
+"With client-side applications you’re at the mercy of the user, who may not install the update for some time."
+
+"We will then discuss how those formats are used for data storage and for communication: in web services, Representational State Transfer (REST), and remote procedure calls (RPC), as well as message-passing systems such as actors and message queues."
+
+Formats for Encoding Data
+
+"In memory, data is kept in objects, structs, lists, arrays, hash tables, trees, and so on. These data structures are optimized for efficient access and manipulation by the CPU (typically using pointers)."
+
+"When you want to write data to a file or send it over the network, you have to encode it as some kind of self-contained sequence of bytes (for example, a JSON document)."
+
+"The translation from the in-memory representation to a byte sequence is called encoding (also known as serialization or marshalling), and the reverse is called decoding (parsing, deserialization, unmarshalling)."
+
+Language-Specific Formats
+
+"In order to restore data in the same object types, the decoding process needs to be able to instantiate arbitrary classes."
+
+"This is frequently a source of security problems: if an attacker can get your application to decode an arbitrary byte sequence, they can instantiate arbitrary classes, which in turn often allows them to do terrible things such as remotely executing arbitrary code."
+
+"For these reasons it’s generally a bad idea to use your language’s built-in encoding for anything other than very transient purposes."
+
+JSON, XML, and Binary Variants
+
+"JSON’s popularity is mainly due to its built-in support in web browsers (by virtue of being a subset of JavaScript) and simplicity relative to XML."
+
+"An example of numbers larger than 253 occurs on Twitter, which uses a 64-bit number to identify each tweet."
+
+"Despite these flaws, JSON, XML, and CSV are good enough for many purposes."
+
+Binary encoding
+
+"This observation led to the development of a profusion of binary encodings for JSON (MessagePack, BSON, BJSON, UBJSON, BISON, and Smile, to name a few) and for XML (WBXML and Fast Infoset, for example)."
+
+Thrift and Protocol Buffers
+
+"Protocol Buffers was originally developed at Google, Thrift was originally developed at Facebook, and both were made open source in 2007–08."
+
+Field tags and schema evolution
+
+"How do Thrift and Protocol Buffers handle schema changes while keeping backward and forward compatibility?"
+
+"As long as each field has a unique tag number, new code can always read old data, because the tag numbers still have the same meaning."
+
+"The only detail is that if you add a new field, you cannot make it required."
+
+"Therefore, to maintain backward compatibility, every field you add after the initial deployment of the schema must be optional or have a default value."
+
+Datatypes and schema evolution
+
+"A curious detail of Protocol Buffers is that it does not have a list or array datatype, but instead has a repeated marker for fields (which is a third option alongside required and optional)."
+
+"New code reading old data sees a list with zero or one elements (depending on whether the field was present); old code reading new data sees only the last element of the list."
+
+Avro
+
+"Apache Avro is another binary encoding format that is interestingly different from Protocol Buffers and Thrift."
+
+"It was started in 2009 as a subproject of Hadoop, as a result of Thrift not being a good fit for Hadoop’s use cases."
+
+"If you examine the byte sequence, you can see that there is nothing to identify fields or their datatypes."
+
+"This means that the binary data can only be decoded correctly if the code reading the data is using the exact same schema as the code that wrote the data."
+
+The writer’s schema and the reader’s schema
+
+"The key idea with Avro is that the writer’s schema and the reader’s schema don’t have to be the same—they only need to be compatible."
+
+Schema evolution rules
+
+"If you were to add a field that has no default value, new readers wouldn’t be able to read data written by old writers, so you would break backward compatibility."
+
+"If you were to remove a field that has no default value, old readers wouldn’t be able to read data written by new writers, so you would break forward compatibility."
+
+But what is the writer’s schema?
+
+"A common use for Avro — especially in the context of Hadoop — is for storing a large file containing millions of records, all encoded with the same schema."
+
+"The simplest solution is to include a version number at the beginning of every encoded record, and to keep a list of schema versions in your database."
+
+Dynamically generated schemas
+
+"The difference is that Avro is friendlier to dynamically generated schemas."
+
+"For example, say you have a relational database whose contents you want to dump to a file, and you want to use a binary format to avoid the aforementioned problems with textual formats (JSON, CSV, SQL)."
+
+"If you use Avro, you can fairly easily generate an Avro schema (in the JSON representation we saw earlier) from the relational schema and encode the database contents using that schema, dumping it all to an Avro object container file."
+
+"By contrast, if you were using Thrift or Protocol Buffers for this purpose, the field tags would likely have to be assigned by hand: every time the database schema changes, an administrator would have to manually update the mapping from database column names to field tags."
+
+Code generation and dynamically typed languages
+
+"Thrift and Protocol Buffers rely on code generation: after a schema has been defined, you can generate code that implements this schema in a programming language of your choice."
+
+"In dynamically typed programming languages such as JavaScript, Ruby, or Python, there is not much point in generating code, since there is no compile-time type checker to satisfy."
+
+The Merits of Schemas
+
+"As we saw, Protocol Buffers, Thrift, and Avro all use a schema to describe a binary encoding format."
+
+"In summary, schema evolution allows the same kind of flexibility as schemaless/ schema-on-read JSON databases provide, while also providing better guarantees about your data and better tooling."
+
+Modes of Dataflow
+
+"Compatibility is a relationship between one process that encodes the data, and another process that decodes it."
+
+Different values written at different times
+
+"Rewriting (migrating) data into a new schema is certainly possible, but it’s an expensive thing to do on a large dataset, so most databases avoid it if possible."
+
+Archival storage
+
+"As the data dump is written in one go and is thereafter immutable, formats like Avro object container files are a good fit."
+
+Dataflow Through Services: REST and RPC
+
+"Moreover, a server can itself be a client to another service (for example, a typical web app server acts as client to a database)."
+
+"This approach is often used to decompose a large application into smaller services by area of functionality, such that one service makes a request to another when it requires some functionality or data from that other service."
+
+"This restriction provides a degree of encapsulation: services can impose fine-grained restrictions on what clients can and cannot do."
+
+"A key design goal of a service-oriented/microservices architecture is to make the application easier to change and maintain by making services independently deployable and evolvable."
+
+Web services
+
+"There are two popular approaches to web services: REST and SOAP."
+
+"They are almost diametrically opposed in terms of philosophy, and often the subject of heated debate among their respective proponents."
+
+"It emphasizes simple data formats, using URLs for identifying resources and using HTTP features for cache control, authentication, and content type negotiation."
+
+"By contrast, SOAP is an XML-based protocol for making network API requests."
+
+"The API of a SOAP web service is described using an XML-based language called the Web Services Description Language, or WSDL."
+
+"As WSDL is not designed to be human-readable, and as SOAP messages are often too complex to construct manually, users of SOAP rely heavily on tool support, code generation, and IDEs."
+
+The problems with remote procedure calls (RPCs)
+
+"The RPC model tries to make a request to a remote network service look the same as calling a function or method in your programming language, within the same process (this abstraction is called location transparency)."
+
+"A local function call either returns a result, or throws an exception, or never returns (because it goes into an infinite loop or the process crashes)."
+
+"A network request has another possible outcome: it may return without a result, due to a timeout."
+
+"The client and the service may be implemented in different programming languages, so the RPC framework must translate datatypes from one language into another."
+
+"All of these factors mean that there’s no point trying to make a remote service look too much like a local object in your programming language, because it’s a fundamentally different thing."
+
+Current directions for RPC
+
+"Various RPC frameworks have been built on top of all the encodings mentioned in this chapter: for example, Thrift and Avro come with RPC support included, gRPC is an RPC implementation using Protocol Buffers, Finagle also uses Thrift, and Rest.li uses JSON over HTTP."
+
+"Custom RPC protocols with a binary encoding format can achieve better performance than something generic like JSON over REST."
+
+Data encoding and evolution for RPC
+
+"If a compatibility-breaking change is required, the service provider often ends up maintaining multiple versions of the service API side by side."
+
+Message-Passing Dataflow
+
+"In this final section, we will briefly look at asynchronous message-passing systems, which are somewhere between RPC and databases."
+
+"They are similar to RPC in that a client’s request (usually called a message) is delivered to another process with low latency."
+
+"They are similar to databases in that the message is not sent via a direct network connection, but goes via an intermediary called a message broker (also called a message queue or message-oriented middleware), which stores the message temporarily."
+
+Message brokers
+
+"The detailed delivery semantics vary by implementation and configuration, but in general, message brokers are used as follows: one process sends a message to a named queue or topic, and the broker ensures that the message is delivered to one or more consumers of or subscribers to that queue or topic."
+
+"Message brokers typically don’t enforce any particular data model—a message is just a sequence of bytes with some metadata, so you can use any encoding format."
+
+Distributed actor frameworks
+
+"The actor model is a programming model for concurrency in a single process."
+
+"Rather than dealing directly with threads (and the associated problems of race conditions, locking, and deadlock), logic is encapsulated in actors."
+
+"In distributed actor frameworks, this programming model is used to scale an application across multiple nodes."
+
+"A distributed actor framework essentially integrates a message broker and the actor programming model into a single framework."
+
+"Akka uses Java’s built-in serialization by default, which does not provide forward or backward compatibility."
+
+Summary
+
+"We saw how the details of these encodings affect not only their efficiency, but more importantly also the architecture of applications and your options for deploying them."
+
+"In particular, many services need to support rolling upgrades, where a new version of a service is gradually deployed to a few nodes at a time, rather than deploying to all nodes simultaneously."
+
+"These properties are hugely beneficial for evolvability, the ease of making changes to an application."
+
+"Programming language–specific encodings are restricted to a single programming language and often fail to provide forward and backward compatibility."
+
+"Textual formats like JSON, XML, and CSV are widespread, and their compatibility depends on how you use them."
+
+"Binary schema–driven formats like Thrift, Protocol Buffers, and Avro allow compact, efficient encoding with clearly defined forward and backward compatibility semantics."
+
+"We can conclude that with a bit of care, backward/forward compatibility and rolling upgrades are quite achievable."
+
+## II Distributed Data
+
