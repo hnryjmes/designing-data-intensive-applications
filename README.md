@@ -144,3 +144,196 @@ Summary
 
 ### 2 Data Models and Query Languages
 
+"Data models are perhaps the most important part of developing software, because they have such a profound effect: not only on how the software is written, but also on how we think about the problem that we are solving."
+
+Relational Model Versus Document Model
+
+"The best-known data model today is probably that of SQL, based on the relational model proposed by Edgar Codd in 1970: data is organized into relations (called tables in SQL), where each relation is an unordered collection of tuples (rows in SQL)."
+
+"The dominance of relational databases has lasted around 25‒30 years — an eternity in computing history."
+
+"The use cases appear mundane from today’s perspective: typically transaction processing (entering sales or banking trans‐ actions, airline reservations, stock-keeping in warehouses) and batch processing (customer invoicing, payroll, reporting)."
+
+The Birth of NoSQL
+
+"Frustration with the restrictiveness of relational schemas, and a desire for a more dynamic and expressive data model"
+
+The Object-Relational Mismatch
+
+"Most application development today is done in object-oriented programming languages, which leads to a common criticism of the SQL data model: if data is stored in relational tables, an awkward translation layer is required between the objects in the application code and the database model of tables, rows, and columns."
+
+"Some developers feel that the JSON model reduces the impedance mismatch between the application code and the storage layer."
+
+"If you want to fetch a profile in the relational example, you need to either perform multiple queries (query each table by `user_id`) or perform a messy multi-way join between the users table and its subordinate tables."
+
+Many-to-One and Many-to-Many Relationships
+
+"When you use an ID, the information that is meaningful to humans (such as the word Philanthropy) is stored in only one place, and everything that refers to it uses an ID (which only has meaning within the database)."
+
+"In relational databases, it’s normal to refer to rows in other tables by ID, because joins are easy."
+
+"In document databases, joins are not needed for one-to-many tree structures, and support for joins is often weak."
+
+Are Document Databases Repeating History?
+
+"This debate is much older than NoSQL — in fact, it goes back to the very earliest computerized database systems."
+
+The network model
+
+"In the tree structure of the hierarchical model, every record has exactly one parent; in the network model, a record could have multiple parents."
+
+"The only way of accessing a record was to follow a path from a root record along these chains of links."
+
+The relational model
+
+"What the relational model did, by contrast, was to lay out all the data in the open: a relation (table) is simply a collection of tuples (rows), and that’s it."
+
+"But a key insight of the relational model was this: you only need to build a query optimizer once, and then all applications that use the database can benefit from it."
+
+Comparison to document databases
+
+"However, when it comes to representing many-to-one and many-to-many relation‐ ships, relational and document databases are not fundamentally different: in both cases, the related item is referenced by a unique identifier, which is called a foreign key in the relational model and a document reference in the document model."
+
+Relational Versus Document Databases Today
+
+"The main arguments in favor of the document data model are schema flexibility, better performance due to locality, and that for some applications it is closer to the data structures used by the application."
+
+"The relational model counters by providing better support for joins, and many-to-one and many-to-many relationships."
+
+Which data model leads to simpler application code?
+
+"It’s not possible to say in general which data model leads to simpler application code; it depends on the kinds of relationships that exist between data items."
+
+Schema flexibility in the document model
+
+"No schema means that arbitrary keys and values can be added to a document, and when reading, clients have no guarantees as to what fields the documents may contain."
+
+Data locality for queries
+
+"It’s worth pointing out that the idea of grouping related data together for locality is not limited to the document model."
+
+"For example, Google’s Spanner database offers the same locality properties in a relational data model, by allowing the schema to declare that a table’s rows should be interleaved (nested) within a parent table."
+
+Convergence of document and relational databases
+
+"PostgreSQL since version 9.3, MySQL since version 5.7, and IBM DB2 since ver‐ sion 10.5 also have a similar level of support for JSON documents."
+
+"If a database is able to handle document-like data and also perform relational queries on it, applications can use the combination of features that best fits their needs."
+
+Query Languages for Data
+
+"In the relational algebra, you would instead write: `sharks = σfamily = “Sharks” (animals)`"
+
+"When SQL was defined, it followed the structure of the relational algebra fairly closely: `SELECT * FROM animals WHERE family = 'Sharks';`"
+
+"The fact that SQL is more limited in functionality gives the database much more room for automatic optimizations."
+
+"Declarative languages have a better chance of getting faster in parallel execution because they specify only the pattern of the results, not the algorithm that is used to determine the results."
+
+Declarative Queries on the Web
+
+"In a web browser, using declarative CSS styling is much better than manipulating styles imperatively in JavaScript."
+
+"Similarly, in databases, declarative query languages like SQL turned out to be much better than imperative query APIs."
+
+MapReduce Querying
+
+"MapReduce is a programming model for processing large amounts of data in bulk across many machines, popularized by Google."
+
+"A limited form of MapReduce is supported by some NoSQL datastores, including MongoDB and CouchDB, as a mechanism for performing read-only queries across many documents."
+
+"To give an example, imagine you are a marine biologist, and you add an observation record to your database every time you see animals in the ocean."
+
+"Now you want to generate a report saying how many sharks you have sighted per month."
+
+"In PostgreSQL you might express that query like this:"
+
+```
+SELECT date_trunc('month', observation_timestamp) AS observation_month, sum(num_animals) AS total_animals 
+FROM observations 
+WHERE family = 'Sharks' 
+GROUP BY observation_month;
+```
+
+"This query first filters the observations to only show species in the Sharks family, then groups the observations by the calendar month in which they occurred, and finally adds up the number of animals seen in all observations in that month."
+
+"The same can be expressed with MongoDB’s MapReduce feature as follows:"
+
+```
+db.observations.mapReduce( function map() {
+var year = this.observationTimestamp.getFullYear(); var month = this.observationTimestamp.getMonth() + 1; emit(year + "-" + month, this.numAnimals);
+},
+function reduce(key, values) {
+return Array.sum(values); },
+        {
+            query: { family: "Sharks" },
+            out: "monthlySharkReport"
+} );
+```
+
+"The map and reduce functions are somewhat restricted in what they are allowed to do."
+
+"They must be pure functions, which means they only use the data that is passed to them as input, they cannot perform additional database queries, and they must not have any side effects."
+
+"The aggregation pipeline language is similar in expressiveness to a subset of SQL, but it uses a JSON-based syntax rather than SQL’s English-sentence-style syntax; the difference is perhaps a matter of taste."
+
+Graph-Like Data Models
+
+"The relational model can handle simple cases of many-to-many relationships, but as the connections within your data become more complex, it becomes more natural to start modeling your data as a graph."
+
+"Well-known algorithms can operate on these graphs: for example, car navigation systems search for the shortest path between two points in a road network, and PageRank can be used on the web graph to determine the popularity of a web page and thus its ranking in search results."
+
+Property Graphs
+
+"Graphs are good for evolvability: as you add features to your application, a graph can easily be extended to accommodate changes in your application’s data structures."
+
+The Cypher Query Language
+
+"As is typical for a declarative query language, you don’t need to specify such execution details when writing the query: the query optimizer automatically chooses the strategy that is predicted to be the most efficient, so you can get on with writing the rest of your application."
+
+Graph Queries in SQL
+
+"In a graph query, you may need to traverse a variable number of edges before you find the vertex you’re looking for — that is, the number of joins is not fixed in advance."
+
+Triple-Stores and SPARQL
+
+"The triple-store model is mostly equivalent to the property graph model, using different words to describe the same ideas."
+
+The semantic web
+
+"The semantic web is fundamentally a simple and reasonable idea: websites already publish information as text and pictures for humans to read, so why don’t they also publish information as machine-readable data for computers to read?"
+
+The RDF data model
+
+"RDF has a few quirks due to the fact that it is designed for internet-wide data exchange."
+
+The SPARQL query language
+
+"SPARQL is a nice query language — even if the semantic web never happens, it can be a powerful tool for applications to use internally."
+
+Graph Databases Compared to the Network Model
+
+"Are graph databases the second coming of CODASYL in disguise?"
+
+"In CODASYL, a database had a schema that specified which record type could be nested within which other record type."
+
+"In a graph database, there is no such restriction: any vertex can have an edge to any other vertex."
+
+The Foundation: Datalog
+
+"Datalog’s data model is similar to the triple-store model, generalized a bit."
+
+"Instead of writing a triple as (subject, predicate, object), we write it as predicate(subject, object)."
+
+Summary
+
+"Historically, data started out being represented as one big tree (the hierarchical model), but that wasn’t good for representing many-to-many relationships, so the relational model was invented to solve that problem."
+
+"Document databases target use cases where data comes in self-contained documents and relationships between one document and another are rare."
+
+"Graph databases go in the opposite direction, targeting use cases where anything is potentially related to everything."
+
+"All three models (document, relational, and graph) are widely used today, and each is good in its respective domain."
+
+### 3 Storage and Retrieval
+
