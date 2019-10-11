@@ -835,3 +835,385 @@ Summary
 
 ## II Distributed Data
 
+Scalability
+
+"If your data volume, read load, or write load grows bigger than a single machine can handle, you can potentially spread the load across multiple machines."
+
+Fault tolerance/high availability
+
+"If your application needs to continue working even if one machine (or several machines, or the network, or an entire datacenter) goes down, you can use multiple machines to give you redundancy."
+
+Latency
+
+"If you have users around the world, you might want to have servers at various locations worldwide so that each user can be served from a datacenter that is geographically close to them."
+
+Scaling to Higher Load
+
+"The problem with a shared-memory approach is that the cost grows faster than linearly: a machine with twice as many CPUs, twice as much RAM, and twice as much disk capacity as another typically costs significantly more than twice as much."
+
+Shared-Nothing Architectures
+
+"In this approach, each machine or virtual machine running the database software is called a node."
+
+"You can potentially distribute data across multiple geographic regions, and thus reduce latency for users and potentially be able to survive the loss of an entire datacenter."
+
+"In some cases, a simple single-threaded program can perform significantly better than a cluster with over 100 CPU cores."
+
+Replication Versus Partitioning
+
+Replication
+
+"Replication provides redundancy: if some nodes are unavailable, the data can still be served from the remaining nodes."
+
+Partitioning
+
+"Splitting a big database into smaller subsets called partitions so that different partitions can be assigned to different nodes (also known as sharding)."
+
+### 5 Replication
+
+"If the data that you’re replicating does not change over time, then replication is easy: you just need to copy the data to every node once, and you’re done."
+
+"We will discuss three popular algorithms for replicating changes between nodes: single-leader, multi-leader, and leaderless replication."
+
+"There are many trade-offs to consider with replication: for example, whether to use synchronous or asynchronous replication, and how to handle failed replicas."
+
+Leaders and Followers
+
+"When clients want to write to the database, they must send their requests to the leader, which first writes the new data to its local storage."
+
+"Whenever the leader writes new data to its local storage, it also sends the data change to all of its followers as part of a replication log or change stream."
+
+Synchronous Versus Asynchronous Replication
+
+"An important detail of a replicated system is whether the replication happens synchronously or asynchronously."
+
+"Normally, replication is quite fast: most database systems apply changes to followers in less than a second."
+
+"There are circumstances when followers might fall behind the leader by several minutes or more; for example, if a follower is recovering from a failure, if the system is operating near maximum capacity, or if there are network problems between the nodes."
+
+"For that reason, it is impractical for all followers to be synchronous: any one node outage would cause the whole system to grind to a halt."
+
+"However, a fully asynchronous configuration has the advantage that the leader can continue processing writes, even if all of its followers have fallen behind."
+
+Research on Replication
+
+"It can be a serious problem for asynchronously replicated systems to lose data if the leader fails, so researchers have continued investigating replication methods that do not lose data but still provide good performance and availability."
+
+Setting Up New Followers
+
+"In some systems the process is fully automated, whereas in others it can be a somewhat arcane multi-step workflow that needs to be manually performed by an administrator."
+
+Handling Node Outages
+
+"Thus, our goal is to keep the system as a whole running despite individual node failures, and to keep the impact of a node outage as small as possible."
+
+Follower failure: Catch-up recovery
+
+"If a follower crashes and is restarted, or if the network between the leader and the follower is temporarily interrupted, the follower can recover quite easily: from its log, it knows the last transaction that was processed before the fault occurred."
+
+Leader failure: Failover
+
+"Handling a failure of the leader is trickier: one of the followers needs to be promoted to be the new leader, clients need to be reconfigured to send their writes to the new leader, and the other followers need to start consuming data changes from the new leader."
+
+"There is no foolproof way of detecting what has gone wrong, so most systems simply use a timeout: nodes frequently bounce messages back and forth between each other, and if a node doesn’t respond for some period of time — say, 30 seconds — it is assumed to be dead."
+
+"This could be done through an election process (where the leader is chosen by a majority of the remaining replicas), or a new leader could be appointed by a previously elected controller node."
+
+"The system needs to ensure that the old leader becomes a follower and recognizes the new leader."
+
+"If asynchronous replication is used, the new leader may not have received all the writes from the old leader before it failed."
+
+"Discarding writes is especially dangerous if other storage systems outside of the database need to be coordinated with the database contents."
+
+"For example, in one incident at GitHub, an out-of-date MySQL follower was promoted to leader."
+
+"The database used an autoincrementing counter to assign primary keys to new rows, but because the new leader’s counter lagged behind the old leader’s, it reused some primary keys that were previously assigned by the old leader."
+
+"These primary keys were also used in a Redis store, so the reuse of primary keys resulted in inconsistency between MySQL and Redis, which caused some private data to be disclosed to the wrong users."
+
+"This situation is called split brain, and it is dangerous: if both leaders accept writes, and there is no process for resolving conflicts, data is likely to be lost or corrupted."
+
+"What is the right timeout before the leader is declared dead?"
+
+"If the system is already struggling with high load or network problems, an unnecessary failover is likely to make the situation worse, not better."
+
+Implementation of Replication Logs
+
+Statement-based replication
+
+"In the simplest case, the leader logs every write request (statement) that it executes and sends that statement log to its followers."
+
+Write-ahead log (WAL) shipping
+
+"We can use the exact same log to build a replica on another node: besides writing the log to disk, the leader also sends it across the network to its followers."
+
+"The main disadvantage is that the log describes the data on a very low level: a WAL contains details of which bytes were changed in which disk blocks."
+
+"If the replication protocol allows the follower to use a newer software version than the leader, you can perform a zero-downtime upgrade of the database software by first upgrading the followers and then performing a failover to make one of the upgraded nodes the new leader."
+
+Logical (row-based) log replication
+
+"An alternative is to use different log formats for replication and for the storage engine, which allows the replication log to be decoupled from the storage engine internals."
+
+"Since a logical log is decoupled from the storage engine internals, it can more easily be kept backward compatible, allowing the leader and the follower to run different versions of the database software, or even different storage engines."
+
+Trigger-based replication
+
+"Trigger-based replication typically has greater overheads than other replication methods, and is more prone to bugs and limitations than the database’s built-in replication."
+
+Problems with Replication Lag
+
+"Leader-based replication requires all writes to go through a single node, but read-only queries can go to any replica."
+
+"This leads to apparent inconsistencies in the database: if you run the same query on the leader and a follower at the same time, you may get different results, because not all writes have been reflected in the follower."
+
+"However, if the system is operating near capacity or if there is a problem in the network, the lag can easily increase to several seconds or even minutes."
+
+Reading Your Own Writes
+
+"With asynchronous replication, there is a problem: if the user views the data shortly after making a write, the new data may not yet have reached the replica."
+
+"To the user, it looks as though the data they submitted was lost, so they will be understandably unhappy."
+
+"In this situation, we need read-after-write consistency, also known as read-your-writes consistency."
+
+"Thus, a simple rule is: always read the user’s own profile from the leader, and any other users’ profiles from a follower."
+
+"If your replicas are distributed across multiple datacenters (for geographical proximity to users or for availability), there is additional complexity."
+
+"Another complication arises when the same user is accessing your service from multiple devices, for example a desktop web browser and a mobile app."
+
+Monotonic Reads
+
+"Our second example of an anomaly that can occur when reading from asynchronous followers is that it’s possible for a user to see things moving backward in time."
+
+"When you read data, you may see an old value; monotonic reads only means that if one user makes several reads in sequence, they will not see time go backward — i.e., they will not read older data after having previously read newer data."
+
+Consistent Prefix Reads
+
+"Preventing this kind of anomaly requires another type of guarantee: consistent prefix reads."
+
+"However, in many distributed databases, different partitions operate independently, so there is no global ordering of writes: when a user reads from the database, they may see some parts of the database in an older state and some in a newer state."
+
+Solutions for Replication Lag
+
+"Pretending that replication is synchronous when in fact it is asynchronous is a recipe for problems down the line."
+
+"It would be better if application developers didn’t have to worry about subtle replication issues and could just trust their databases to “do the right thing.”"
+
+"This is why transactions exist: they are a way for a database to provide stronger guarantees so that the application can be simpler."
+
+Multi-Leader Replication
+
+"Leader-based replication has one major downside: there is only one leader, and all writes must go through it."
+
+"We call this a multi-leader configuration (also known as master–master or active/active replication)."
+
+Use Cases for Multi-Leader Replication
+
+Multi-datacenter operation
+
+"In a multi-leader configuration, you can have a leader in each datacenter."
+
+Performance
+
+"In a multi-leader configuration, every write can be processed in the local datacenter and is replicated asynchronously to the other datacenters."
+
+Tolerance of datacenter outages
+
+"In a multi-leader configuration, each datacenter can continue operating independently of the others, and replication catches up when the failed datacenter comes back online."
+
+Tolerance of network problems
+
+"A multi-leader configuration with asynchronous replication can usually tolerate network problems better: a temporary network interruption does not prevent writes being processed."
+
+Clients with offline operation
+
+"You need to be able to see your meetings (make read requests) and enter new meetings (make write requests) at any time, regardless of whether your device currently has an internet connection."
+
+"From an architectural point of view, this setup is essentially the same as multi-leader replication between datacenters, taken to the extreme: each device is a “datacenter,” and the network connection between them is extremely unreliable."
+
+Collaborative editing
+
+"We don’t usually think of collaborative editing as a database replication problem, but it has a lot in common with the previously mentioned offline editing use case."
+
+"However, for faster collaboration, you may want to make the unit of change very small (e.g., a single keystroke) and avoid locking."
+
+Handling Write Conflicts
+
+"The biggest problem with multi-leader replication is that write conflicts can occur, which means that conflict resolution is required."
+
+Synchronous versus asynchronous conflict detection
+
+"If you want synchronous conflict detection, you might as well just use single-leader replication."
+
+Conflict avoidance
+
+"The simplest strategy for dealing with conflicts is to avoid them: if the application can ensure that all writes for a particular record go through the same leader, then conflicts cannot occur."
+
+Converging toward a consistent state
+
+"Give each write a unique ID (e.g., a timestamp, a long random number, a UUID, or a hash of the key and value), pick the write with the highest ID as the winner, and throw away the other writes."
+
+Custom conflict resolution logic
+
+On write
+
+"As soon as the database system detects a conflict in the log of replicated changes, it calls the conflict handler."
+
+On read
+
+"The next time the data is read, these multiple versions of the data are returned to the application."
+
+Automatic Conflict Resolution
+
+"Amazon is a frequently cited example of surprising effects due to a conflict resolution handler: for some time, the conflict resolution logic on the shopping cart would preserve items added to the cart, but not items removed from the cart."
+
+What is a conflict?
+
+"This application needs to ensure that each room is only booked by one group of people at any one time (i.e., there must not be any overlapping bookings for the same room)."
+
+Multi-Leader Replication Topologies
+
+"A replication topology describes the communication paths along which writes are propagated from one node to another."
+
+"The most general topology is all-to-all, in which every leader sends its writes to every other leader."
+
+"However, more restricted topologies are also used: for example, MySQL by default supports only a circular topology, in which each node receives writes from one node and forwards those writes (plus any writes of its own) to one other node."
+
+"Another popular topology has the shape of a star: one designated root node forwards writes to all of the other nodes."
+
+Leaderless Replication
+
+"Some data storage systems take a different approach, abandoning the concept of a leader and allowing any replica to directly accept writes from clients."
+
+"Riak, Cassandra, and Voldemort are open source datastores with leaderless replication models inspired by Dynamo, so this kind of database is also known as Dynamo-style."
+
+Writing to the Database When a Node Is Down
+
+"To solve that problem, when a client reads from the database, it doesn’t just send its request to one replica: read requests are also sent to several nodes in parallel."
+
+Read repair and anti-entropy
+
+Read repair
+
+"The client sees that replica 3 has a stale value and writes the newer value back to that replica."
+
+Anti-entropy process
+
+"In addition, some datastores have a background process that constantly looks for differences in the data between replicas and copies any missing data from one replica to another."
+
+Quorums for reading and writing
+
+"More generally, if there are n replicas, every write must be confirmed by w nodes to be considered successful, and we must query at least r nodes for each read."
+
+"As long as w + r > n, we expect to get an up-to-date value when reading, because at least one of the r nodes we’re reading from must be up to date."
+
+Limitations of Quorum Consistency
+
+"With a smaller w and r you are more likely to read stale values, because it’s more likely that your read didn’t include the node with the latest value."
+
+"Thus, although quorums appear to guarantee that a read returns the latest written value, in practice it is not so simple."
+
+"Dynamo-style databases are generally optimized for use cases that can tolerate eventual consistency."
+
+Monitoring staleness
+
+"For leader-based replication, the database typically exposes metrics for the replication lag, which you can feed into a monitoring system."
+
+Sloppy Quorums and Hinted Handoff
+
+"In a large cluster (with significantly more than n nodes) it’s likely that the client can connect to some database nodes during the network interruption, just not to the nodes that it needs to assemble a quorum for a particular value."
+
+"The latter is known as a sloppy quorum: writes and reads still require w and r successful responses, but those may include nodes that are not among the designated n “home” nodes for a value."
+
+"By analogy, if you lock yourself out of your house, you may knock on the neighbor’s door and ask whether you may stay on their couch temporarily."
+
+Multi-datacenter operation
+
+"Leaderless replication is also suitable for multi-datacenter operation, since it is designed to tolerate conflicting concurrent writes, network interruptions, and latency spikes."
+
+Detecting Concurrent Writes
+
+"The problem is that events may arrive in a different order at different nodes, due to variable network delays and partial failures."
+
+Last write wins (discarding concurrent writes)
+
+"One approach for achieving eventual convergence is to declare that each replica need only store the most “recent” value and allow “older” values to be overwritten and discarded."
+
+"If losing data is not acceptable, LWW is a poor choice for conflict resolution."
+
+The “happens-before” relationship and concurrency
+
+"An operation A happens before another operation B if B knows about A, or depends on A, or builds upon A in some way."
+
+"Thus, whenever you have two operations A and B, there are three possibilities: either A happened before B, or B happened before A, or A and B are concurrent."
+
+Concurrency, Time, and Relativity
+
+"Consequently, two events that occur some distance apart cannot possibly affect each other if the time between the events is shorter than the time it takes light to travel the distance between them."
+
+"In computer systems, two operations might be concurrent even though the speed of light would in principle have allowed one operation to affect the other."
+
+Capturing the happens-before relationship
+
+"Once we have worked out how to do this on a single replica, we can generalize the approach to a leaderless database with multiple replicas."
+
+Merging concurrently written values
+
+"To prevent this problem, an item cannot simply be deleted from the database when it is removed; instead, the system must leave a marker with an appropriate version number to indicate that the item has been removed when merging siblings."
+
+Version vectors
+
+"The version vector structure ensures that it is safe to read from one replica and subsequently write back to another replica."
+
+Version vectors and vector clocks
+
+"A version vector is sometimes also called a vector clock, even though they are not quite the same."
+
+Summary
+
+High availability
+
+"Keeping the system running, even when one machine (or several machines, or an entire datacenter) goes down"
+
+Disconnected operation
+
+"Allowing an application to continue working when there is a network interruption"
+
+Latency
+
+"Placing data geographically close to users, so that users can interact with it faster"
+
+Scalability
+
+"Being able to handle a higher volume of reads than a single machine could handle, by performing reads on replicas"
+
+"At a minimum, we need to deal with unavailable nodes and network interruptions (and that’s not even considering the more insidious kinds of fault, such as silent data corruption due to software bugs)."
+
+Single-leader replication
+
+"Clients send all writes to a single node (the leader), which sends a stream of data change events to the other replicas (followers)."
+
+Multi-leader replication
+
+"Clients send each write to one of several leader nodes, any of which can accept writes."
+
+Leaderless replication
+
+"Clients send each write to several nodes, and read from several nodes in parallel in order to detect and correct nodes with stale data."
+
+Read-after-write consistency
+
+"Users should always see data that they submitted themselves."
+
+Monotonic reads
+
+"After users have seen the data at one point in time, they shouldn’t later see the data from some earlier point in time."
+
+Consistent prefix reads
+
+"Users should see the data in a state that makes causal sense: for example, seeing a question and its reply in the correct order."
+
+### 6 Partitioning
+
