@@ -1217,3 +1217,123 @@ Consistent prefix reads
 
 ### 6 Partitioning
 
+"For very large datasets, or very high query throughput, that is not sufficient: we need to break the data up into partitions, also known as sharding."
+
+Terminological confusion
+
+"What we call a partition here is called a shard in MongoDB, Elasticsearch, and SolrCloud; it’s known as a region in HBase, a tablet in Bigtable, a vnode in Cassandra and Riak, and a vBucket in Couchbase."
+
+"The main reason for wanting to partition data is scalability."
+
+Partitioning and Replication
+
+"This means that, even though each record belongs to exactly one partition, it may still be stored on several different nodes for fault tolerance."
+
+Partitioning of Key-Value Data
+
+"If the partitioning is unfair, so that some partitions have more data or queries than others, we call it skewed."
+
+"The simplest approach for avoiding hot spots would be to assign records to nodes randomly."
+
+Partitioning by Key Range
+
+"However, the downside of key range partitioning is that certain access patterns can lead to hot spots."
+
+"To avoid this problem in the sensor database, you need to use something other than the timestamp as the first element of the key."
+
+Partitioning by Hash of Key
+
+"Because of this risk of skew and hot spots, many distributed datastores use a hash function to determine the partition for a given key."
+
+"A good hash function takes skewed data and makes it uniformly distributed."
+
+Consistent Hashing
+
+"Because this is so confusing, it’s best to avoid the term consistent hashing and just call it hash partitioning instead."
+
+"Unfortunately however, by using the hash of the key for partitioning we lose a nice property of key-range partitioning: the ability to do efficient range queries."
+
+Skewed Workloads and Relieving Hot Spots
+
+"Just a two-digit decimal random number would split the writes to the key evenly across 100 different keys, allowing those keys to be distributed to different partitions."
+
+Partitioning and Secondary Indexes
+
+"The problem with secondary indexes is that they don’t map neatly to partitions."
+
+Partitioning Secondary Indexes by Document
+
+"However, reading from a document-partitioned index requires care: unless you have done something special with the document IDs, there is no reason why all the cars with a particular color or a particular make would be in the same partition."
+
+"Thus, if you want to search for red cars, you need to send the query to all partitions, and combine all the results you get back."
+
+"This approach to querying a partitioned database is sometimes known as scatter/ gather, and it can make read queries on secondary indexes quite expensive."
+
+Partitioning Secondary Indexes by Term
+
+"We call this kind of index term-partitioned, because the term we’re looking for determines the partition of the index."
+
+"The advantage of a global (term-partitioned) index over a document-partitioned index is that it can make reads more efficient: rather than doing scatter/gather over all partitions, a client only needs to make a request to the partition containing the term that it wants."
+
+"However, the downside of a global index is that writes are slower and more complicated, because a write to a single document may now affect multiple partitions of the index (every term in the document might be on a different partition, on a different node)."
+
+Rebalancing Partitions
+
+"The process of moving load from one node in the cluster to another is called rebalancing."
+
+Strategies for Rebalancing
+
+How not to do it: hash mod N
+
+"The problem with the mod N approach is that if the number of nodes N changes, most of the keys will need to be moved from one node to another."
+
+Fixed number of partitions
+
+"For example, a database running on a cluster of 10 nodes may be split into 1,000 partitions from the outset so that approximately 100 partitions are assigned to each node."
+
+Dynamic partitioning
+
+"When a partition grows to exceed a configured size (on HBase, the default is 10 GB), it is split into two partitions so that approximately half of the data ends up on each side of the split."
+
+Partitioning proportionally to nodes
+
+"When a new node joins the cluster, it randomly chooses a fixed number of existing partitions to split, and then takes ownership of one half of each of those split partitions while leaving the other half of each partition in place."
+
+Operations: Automatic or Manual Rebalancing
+
+"For example, say one node is overloaded and is temporarily slow to respond to requests."
+
+"The other nodes conclude that the overloaded node is dead, and automatically rebalance the cluster to move load away from it."
+
+"This puts additional load on the overloaded node, other nodes, and the network — making the situation worse and potentially causing a cascading failure."
+
+Request Routing
+
+"Somebody needs to stay on top of those changes in order to answer the question: if I want to read or write the key “foo”, which IP address and port number do I need to connect to?"
+
+"Each node registers itself in ZooKeeper, and ZooKeeper maintains the authoritative mapping of partitions to nodes."
+
+"Whenever a partition changes ownership, or a node is added or removed, ZooKeeper notifies the routing tier so that it can keep its routing information up to date."
+
+"HBase, SolrCloud, and Kafka also use ZooKeeper to track partition assignment."
+
+"Cassandra and Riak take a different approach: they use a gossip protocol among the nodes to disseminate any changes in cluster state."
+
+Parallel Query Execution
+
+"However, massively parallel processing (MPP) relational database products, often used for analytics, are much more sophisticated in the types of queries they support."
+
+Summary
+
+"Partitioning is necessary when you have so much data that storing and processing it on a single machine is no longer feasible."
+
+"Key range partitioning, where keys are sorted, and a partition owns all the keys from some minimum up to some maximum."
+
+"Hash partitioning, where a hash function is applied to each key, and a partition owns a range of hashes."
+
+"Document-partitioned indexes (local indexes), where the secondary indexes are stored in the same partition as the primary key and value."
+
+"Term-partitioned indexes (global indexes), where the secondary indexes are partitioned separately, using the indexed values."
+
+### 7 Transactions
+
