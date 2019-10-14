@@ -1691,3 +1691,227 @@ Serializable snapshot isolation (SSI)
 
 ### 8 The Trouble with Distributed Systems
 
+"We will now turn our pessimism to the maximum and assume that anything that can go wrong will go wrong."
+
+Faults and Partial Failures
+
+"There is no fundamental reason why software on a single computer should be flaky: when the hardware is working correctly, the same operation always produces the same result (it is deterministic)."
+
+"This is a deliberate choice in the design of computers: if an internal fault occurs, we prefer a computer to crash completely rather than returning a wrong result, because wrong results are difficult and confusing to deal with."
+
+"The difficulty is that partial failures are nondeterministic: if you try to do anything involving multiple nodes and the network, it may sometimes work and sometimes unpredictably fail."
+
+Cloud Computing and Supercomputing
+
+"Thus, a supercomputer is more like a single-node computer than a distributed system: it deals with partial failure by letting it escalate into total failure — if any part of the system fails, just let everything crash (like a kernel panic on a single machine)."
+
+Building a Reliable System from Unreliable Components
+
+"Error-correcting codes allow digital data to be transmitted accurately across a communication channel that occasionally gets some bits wrong, for example due to radio interference on a wireless network."
+
+"IP (the Internet Protocol) is unreliable: it may drop, delay, duplicate, or reorder packets. TCP (the Transmission Control Protocol) provides a more reliable transport layer on top of IP: it ensures that missing packets are retransmitted, duplicates are eliminated, and packets are reassembled into the order in which they were sent."
+
+Unreliable Networks
+
+"The internet and most internal networks in datacenters (often Ethernet) are asynchronous packet networks."
+
+"The sender can’t even tell whether the packet was delivered: the only option is for the recipient to send a response message, which may in turn be lost or delayed."
+
+"However, when a timeout occurs, you still don’t know whether the remote node got your request or not (and if the request is still queued somewhere, it may still be delivered to the recipient, even if the sender has given up on it)."
+
+Network Faults in Practice
+
+"Sharks might bite undersea cables and damage them."
+
+Detecting Faults
+
+"If a node process crashed (or was killed by an administrator) but the node’s operating system is still running, a script can notify other nodes about the crash so that another node can take over quickly without having to wait for a timeout to expire."
+
+Timeouts and Unbounded Delays
+
+"A short timeout detects faults faster, but carries a higher risk of incorrectly declaring a node dead when in fact it has only suffered a temporary slowdown (e.g., due to a load spike on the node or the network)."
+
+"In particular, it could happen that the node actually wasn’t dead but only slow to respond due to overload; transferring its load to other nodes can cause a cascading failure (in the extreme case, all nodes declare each other dead, and everything stops working)."
+
+Network congestion and queueing
+
+"TCP performs flow control (also known as congestion avoidance or backpressure), in which a node limits its own rate of sending in order to avoid overloading a network link or the receiving node."
+
+TCP Versus UDP
+
+"It’s a trade-off between reliability and variability of delays: as UDP does not perform flow control and does not retransmit lost packets, it avoids some of the reasons for variable network delays (although it is still susceptible to switch queues and scheduling delays)."
+
+"In this case, there’s no point in retransmitting the packet — the application must instead fill the missing packet’s time slot with silence (causing a brief interruption in the sound) and move on in the stream."
+
+Synchronous Versus Asynchronous Networks
+
+"When you make a call over the telephone network, it establishes a circuit: a fixed, guaranteed amount of bandwidth is allocated for the call, along the entire route between the two callers."
+
+"This kind of network is synchronous: even as data passes through several routers, it does not suffer from queueing, because the 16 bits of space for the call have already been reserved in the next hop of the network"
+
+Can we not simply make network delays predictable?
+
+"However, they are not: Ethernet and IP are packet-switched protocols, which suffer from queueing and thus unbounded delays in the network."
+
+"The answer is that they are optimized for bursty traffic."
+
+"Thus, using circuits for bursty data transfers wastes network capacity and makes transfers unnecessarily slow."
+
+"By contrast, TCP dynamically adapts the rate of data transfer to the available network capacity."
+
+"With careful use of quality of service (QoS, prioritization and scheduling of packets) and admission control (rate-limiting senders), it is possible to emulate circuit switching on packet networks, or provide statistically bounded delay."
+
+Latency and Resource Utilization
+
+"More generally, you can think of variable delays as a consequence of dynamic resource partitioning."
+
+"Senders push and jostle with each other to get their packets over the wire as quickly as possible, and the network switches decide which packet to send (i.e., the bandwidth allocation) from one moment to the next."
+
+"This approach has the downside of queueing, but the advantage is that it maximizes utilization of the wire."
+
+"Variable delays in networks are not a law of nature, but simply the result of a cost/ benefit trade-off."
+
+Unreliable Clocks
+
+"It is possible to synchronize clocks to some degree: the most commonly used mechanism is the Network Time Protocol (NTP), which allows the computer clock to be adjusted according to the time reported by a group of servers."
+
+Monotonic Versus Time-of-Day Clocks
+
+Time-of-day clocks
+
+"A time-of-day clock does what you intuitively expect of a clock: it returns the current date and time according to some calendar (also known as wall-clock time)."
+
+"In particular, if the local clock is too far ahead of the NTP server, it may be forcibly reset and appear to jump back to a previous point in time."
+
+"These jumps, as well as the fact that they often ignore leap seconds, make time-of-day clocks unsuitable for measuring elapsed time."
+
+Monotonic clocks
+
+"The name comes from the fact that they are guaranteed to always move forward (whereas a time-of- day clock may jump back in time)."
+
+"In particular, it makes no sense to compare monotonic clock values from two different computers, because they don’t mean the same thing."
+
+Clock Synchronization and Accuracy
+
+"For example, the MiFID II draft European regulation for financial institutions requires all high-frequency trading funds to synchronize their clocks to within 100 microseconds of UTC, in order to help debug market anomalies such as “flash crashes” and to help detect market manipulation."
+
+Relying on Synchronized Clocks
+
+"Any node whose clock drifts too far from the others should be declared dead and removed from the cluster."
+
+Timestamps for ordering events
+
+"When node 2 receives these two events, it will incorrectly conclude that x = 1 is the more recent value and drop the write x = 2."
+
+"Additional causality tracking mechanisms, such as version vectors, are needed in order to prevent violations of causality."
+
+"Logical clocks do not measure the time of day or the number of seconds elapsed, only the relative ordering of events (whether one event happened before or after another)."
+
+"In contrast, time-of-day and monotonic clocks, which measure actual elapsed time, are also known as physical clocks."
+
+Clock readings have a confidence interval
+
+"With an NTP server on the public internet, the best possible accuracy is probably to the tens of milliseconds, and the error may easily spike to over 100 ms when there is network congestion."
+
+"Thus, it doesn’t make sense to think of a clock reading as a point in time — it is more like a range of times, within a confidence interval: for example, a system may be 95% confident that the time now is between 10.3 and 10.5 seconds past the minute, but it doesn’t know any more precisely than that."
+
+"Unfortunately, most systems don’t expose this uncertainty: for example, when you call `clock_gettime()`, the return value doesn’t tell you the expected error of the timestamp, so you don’t know if its confidence interval is five milliseconds or five years."
+
+"An interesting exception is Google’s TrueTime API in Spanner, which explicitly reports the confidence interval on the local clock."
+
+"When you ask it for the current time, you get back two values: `[earliest, latest]`, which are the earliest possible and the latest possible timestamp."
+
+Synchronized clocks for global snapshots
+
+"If a write happened later than the snapshot (i.e., the write has a greater transaction ID than the snapshot), that write is invisible to the snapshot transaction."
+
+"In order to ensure that transaction timestamps reflect causality, Spanner deliberately waits for the length of the confidence interval before committing a read-write trans‐ action."
+
+"In order to keep the wait time as short as possible, Spanner needs to keep the clock uncertainty as small as possible; for this purpose, Google deploys a GPS receiver or atomic clock in each datacenter, allowing clocks to be synchronized to within about 7 ms."
+
+"These ideas are interesting, but they have not yet been implemented in mainstream databases outside of Google."
+
+Process Pauses
+
+"How does a node know that it is still leader (that it hasn’t been declared dead by the others), and that it may safely accept writes?"
+
+"In order to remain leader, the node must periodically renew the lease before it expires."
+
+"When writing multi-threaded code on a single machine, we have fairly good tools for making it thread-safe: mutexes, semaphores, atomic counters, lock-free data structures, blocking queues, and so on."
+
+"Unfortunately, these tools don’t directly translate to distributed systems, because a distributed system has no shared memory—only messages sent over an unreliable network."
+
+Response time guarantees
+
+"Some software runs in environments where a failure to respond within a specified time can cause serious damage: computers that control aircraft, rockets, robots, cars, and other physical objects must respond quickly and predictably to their sensor inputs."
+
+"In these systems, there is a specified deadline by which the software must respond; if it doesn’t meet the deadline, that may cause a failure of the entire system."
+
+"These are so-called hard real-time systems."
+
+"For example, if your car’s onboard sensors detect that you are currently experiencing a crash, you wouldn’t want the release of the airbag to be delayed due to an inopportune GC pause in the airbag release system."
+
+Limiting the impact of garbage collection
+
+"An emerging idea is to treat GC pauses like brief planned outages of a node, and to let other nodes handle requests from clients while one node is collecting its garbage."
+
+Knowledge, Truth, and Lies
+
+"In a distributed system, we can state the assumptions we are making about the behavior (the system model) and design the actual system in such a way that it meets those assumptions."
+
+The Truth Is Defined by the Majority
+
+"A distributed system cannot exclusively rely on a single node, because a node may fail at any time, potentially leaving the system stuck and unable to recover."
+
+"Most commonly, the quorum is an absolute majority of more than half the nodes (although other kinds of quorums are possible)."
+
+The leader and the lock
+
+"When the paused client comes back, it believes (incorrectly) that it still has a valid lease and proceeds to also write to the file."
+
+Fencing tokens
+
+"Let’s assume that every time the lock server grants a lock or lease, it also returns a fencing token, which is a number that increases every time a lock is granted (e.g., incremented by the lock service)."
+
+Byzantine Faults
+
+"Fencing tokens can detect and block a node that is inadvertently acting in error (e.g., because it hasn’t yet found out that its lease has expired)."
+
+The Byzantine Generals Problem
+
+"Most of the generals are loyal, and thus send truthful messages, but the traitors may try to deceive and confuse the others by sending fake or untrue messages (while trying to remain undiscovered)."
+
+Weak forms of lying
+
+"Although we assume that nodes are generally honest, it can be worth adding mechanisms to software that guard against weak forms of “lying” — for example, invalid messages due to hardware issues, software bugs, and misconfiguration."
+
+System Model and Reality
+
+"We do this by defining a system model, which is an abstraction that describes what things an algorithm may assume."
+
+Correctness of an algorithm
+
+"For example, the output of a sorting algorithm has the property that for any two distinct elements of the output list, the element further to the left is smaller than the element further to the right."
+
+Safety and liveness
+
+"In the example just given, uniqueness and monotonic sequence are safety properties, but availability is a liveness property."
+
+"Safety is often informally defined as nothing bad happens, and liveness as something good eventually happens."
+
+Mapping system models to the real world
+
+"Proving an algorithm correct does not mean its implementation on a real system will necessarily always behave correctly."
+
+Summary
+
+"Whenever you try to send a packet over the network, it may be lost or arbitrarily delayed."
+
+"A node’s clock may be significantly out of sync with other nodes (despite your best efforts to set up NTP), it may suddenly jump forward or back in time, and relying on it is dangerous because you most likely don’t have a good measure of your clock’s error interval."
+
+"A process may pause for a substantial amount of time at any point in its execution (perhaps due to a stop-the-world garbage collector), be declared dead by other nodes, and then come back to life again without realizing that it was paused."
+
+"In distributed systems, we try to build tolerance of partial failures into software, so that the system as a whole may continue functioning even when some of its constituent parts are broken."
+
+### 9 Consistency and Consensus
+
