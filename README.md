@@ -2257,3 +2257,352 @@ Summary
 
 ## III Derived Data
 
+"In a large application you often need to be able to access and process data in many different ways, and there is no one database that can satisfy all those different needs simultaneously."
+
+"Applications thus commonly use a combination of several different datastores, indexes, caches, analytics systems, etc. and implement mechanisms for moving data from one store to another."
+
+Systems of Record and Derived Data
+
+"A system of record, also known as source of truth, holds the authoritative version of your data."
+
+
+"If there is any discrepancy between another system and the system of record, then the value in the system of record is (by definition) the correct one."
+
+"Data in a derived system is the result of taking some existing data from another system and transforming or processing it in some way."
+
+### 10 Batch Processing
+
+"The web, and increasing numbers of HTTP/REST-based APIs, has made the request/ response style of interaction so common that it’s easy to take it for granted."
+
+Services (online systems)
+
+"A service waits for a request or instruction from a client to arrive. When one is received, the service tries to handle it as quickly as possible and sends a response back."
+
+Batch processing systems (offline systems)
+
+"A batch processing system takes a large amount of input data, runs a job to process it, and produces some output data."
+
+Stream processing systems (near-real-time systems)
+
+"Stream processing is somewhere between online and offline/batch processing (so it is sometimes called near-real-time or nearline processing)."
+
+Batch Processing with Unix Tools
+
+"So, this one line of the log indicates that on February 27, 2015, at 17:55:11 UTC, the server received a request for the file /css/typography.css from the client IP address 216.58.210.78."
+
+Simple Log Analysis
+
+```sh
+cat /var/log/nginx/access.log |
+  awk '{print $7}' |
+  sort             |
+  uniq -c          |
+  sort -r -n       |
+  head -n  5
+```
+
+"Surprisingly many data analyses can be done in a few minutes using some combination of awk, sed, grep, sort, uniq, and xargs, and they perform surprisingly well."
+
+Chain of commands versus custom program
+
+```ruby
+counts = Hash.new(0)
+
+File.open('/var/log/nginx/access.log') do |file|
+    file.each do |line|
+        url = line.split[6]
+        counts[url] += 1 
+    end
+end
+
+top5 = counts.map{|url, count| [count, url] }.sort.reverse[0...5]
+top5.each{|count, url| puts "#{count} #{url}" }
+```
+
+"This program is not as concise as the chain of Unix pipes, but it’s fairly readable, and which of the two you prefer is partly a matter of taste."
+
+Sorting versus in-memory aggregation
+
+"The Ruby script keeps an in-memory hash table of URLs, where each URL is mapped to the number of times it has been seen."
+
+"The Unix pipeline example does not have such a hash table, but instead relies on sorting a list of URLs in which multiple occurrences of the same URL are simply repeated."
+
+"For most small to mid-sized websites, you can probably fit all distinct URLs, and a counter for each URL, in (say) 1 GB of memory."
+
+"In this example, the working set of the job (the amount of memory to which the job needs random access) depends only on the number of distinct URLs: if there are a million log entries for a single URL, the space required in the hash table is still just one URL plus the size of the counter."
+
+"The sort utility in GNU Coreutils (Linux) automatically handles larger-than- memory datasets by spilling to disk, and automatically parallelizes sorting across multiple CPU cores."
+
+"This means that the simple chain of Unix commands we saw earlier easily scales to large datasets, without running out of memory."
+
+"The bottleneck is likely to be the rate at which the input file can be read from disk."
+
+The Unix Philosophy
+
+"It’s no coincidence that we were able to analyze a log file quite easily, using a chain of commands like in the previous example: this was in fact one of the key design ideas of Unix, and it remains astonishingly relevant today."
+
+"Doug McIlroy, the inventor of Unix pipes, first described them like this in 1964: “We should have some ways of connecting programs like [a] garden hose — screw in another segment when it becomes necessary to massage data in another way. This is the way of I/O also.”"
+
+"The plumbing analogy stuck, and the idea of connecting programs with pipes became part of what is now known as the Unix philosophy — a set of design principles that became popular among the developers and users of Unix."
+
+> 1. Make each program do one thing well. To do a new job, build afresh rather than complicate old programs by adding new “features”.
+> 2. Expect the output of every program to become the input to another, as yet unknown, program. Don’t clutter output with extraneous information. Avoid stringently columnar or binary input formats. Don’t insist on interactive input.
+> 3. Design and build software, even operating systems, to be tried early, ideally within weeks. Don’t hesitate to throw away the clumsy parts and rebuild them.
+> 4. Use tools in preference to unskilled help to lighten a programming task, even if you have to detour to build the tools and expect to throw some of them out after you’ve finished using them.
+
+"The sort tool is a great example of a program that does one thing well."
+
+"It is arguably a better sorting implementation than most programming languages have in their standard libraries (which do not spill to disk and do not use multiple threads, even when that would be beneficial)."
+
+"And yet, sort is barely useful in isolation."
+
+"It only becomes powerful in combination with the other Unix tools, such as uniq."
+
+A uniform interface
+
+"If you want to be able to connect any program’s output to any program’s input, that means that all programs must use the same input/output interface."
+
+"Because that is such a simple interface, many different things can be represented using the same interface: an actual file on the filesystem, a communication channel to another process (Unix socket, stdin, stdout), a device driver (say /dev/audio or /dev/lp0), a socket representing a TCP connection, and so on."
+
+"Our log analysis example used this fact: awk, sort, uniq, and head all treat their input file as a list of records separated by the \n (newline, ASCII 0x0A) character."
+
+"Not many pieces of software interoperate and compose as well as Unix tools do: you can’t easily pipe the contents of your email account and your online shopping history through a custom analysis tool into a spreadsheet and post the results to a social network or a wiki."
+
+"Today it’s an exception, not the norm, to have programs that work together as smoothly as Unix tools do."
+
+Separation of logic and wiring
+
+"Programs that need multiple inputs or outputs are possible but tricky."
+
+"You can’t pipe a program’s output into a network connection."
+
+Transparency and experimentation
+
+"The input files to Unix commands are normally treated as immutable."
+
+"You can end the pipeline at any point, pipe the output into less, and look at it to see if it has the expected form."
+
+"You can write the output of one pipeline stage to a file and use that file as input to the next stage."
+
+MapReduce and Distributed Filesystems
+
+"A single MapReduce job is comparable to a single Unix process: it takes one or more inputs and produces one or more outputs."
+
+"While Unix tools use stdin and stdout as input and output, MapReduce jobs read and write files on a distributed filesystem."
+
+"In Hadoop’s implementation of MapReduce, that filesystem is called HDFS (Hadoop Distributed File System), an open source reimplementation of the Google File System (GFS)."
+
+"Thus, HDFS conceptually creates one big filesystem that can use the space on the disks of all machines running the daemon."
+
+MapReduce Job Execution
+
+"Viewed like this, the role of the mapper is to prepare the data by putting it into a form that is suitable for sorting, and the role of the reducer is to process the data that has been sorted."
+
+Distributed execution of MapReduce
+
+"The main difference from pipelines of Unix commands is that MapReduce can parallelize a computation across many machines, without you having to write code to explicitly handle the parallelism."
+
+"The mapper and reducer only operate on one record at a time; they don’t need to know where their input is coming from or their output is going to, so the framework can handle the complexities of moving data between machines."
+
+MapReduce workflows
+
+"The Hadoop MapReduce framework does not have any particular support for workflows, so this chaining is done implicitly by directory name: the first job must be configured to write its output to a designated directory in HDFS, and the second job must be configured to read that same directory name as its input."
+
+Reduce-Side Joins and Grouping
+
+"When we talk about joins in the context of batch processing, we mean resolving all occurrences of some association within a dataset."
+
+Example: analysis of user activity events
+
+"Thus, a better approach would be to take a copy of the user database and to put it in the same distributed filesystem as the log of user activity events."
+
+"You would then have the user database in one set of files in HDFS and the user activity records in another set of files, and could use MapReduce to bring together all of the relevant records in the same place and process them efficiently."
+
+Sort-merge joins
+
+"Since the reducer processes all of the records for a particular user ID in one go, it only needs to keep one user record in memory at any one time, and it never needs to make any requests over the network."
+
+"This algorithm is known as a sort-merge join, since mapper output is sorted by key, and the reducers then merge together the sorted lists of records from both sides of the join."
+
+Bringing related data together in the same place
+
+"Using the MapReduce programming model has separated the physical network communication aspects of the computation (getting the data to the right machine) from the application logic (processing the data once you have it)."
+
+"This separation contrasts with the typical use of databases, where a request to fetch data from a database often occurs somewhere deep inside a piece of application code."
+
+"Since MapReduce handles all network communication, it also shields the application code from having to worry about partial failures, such as the crash of another node: MapReduce transparently retries failed tasks without affecting the application logic."
+
+GROUP BY
+
+"The simplest way of implementing such a grouping operation with MapReduce is to set up the mappers so that the key-value pairs they produce use the desired grouping key."
+
+"Thus, grouping and joining look quite similar when implemented on top of MapReduce."
+
+Handling skew
+
+"Since a MapReduce job is only complete when all of its mappers and reducers have completed, any subsequent jobs must wait for the slowest reducer to complete before they can start."
+
+"If a join input has hot keys, there are a few algorithms you can use to compensate."
+
+Map-Side Joins
+
+"The join algorithms described in the last section perform the actual join logic in the reducers, and are hence known as reduce-side joins."
+
+"On the other hand, if you can make certain assumptions about your input data, it is possible to make joins faster by using a so-called map-side join."
+
+Broadcast hash joins
+
+"This simple but effective algorithm is called a broadcast hash join: the word broadcast reflects the fact that each mapper for a partition of the large input reads the entirety of the small input (so the small input is effectively “broadcast” to all partitions of the large input), and the word hash reflects its use of a hash table."
+
+Partitioned hash joins
+
+"If the partitioning is done correctly, you can be sure that all the records you might want to join are located in the same numbered partition, and so it is sufficient for each mapper to only read one partition from each of the input datasets."
+
+Map-side merge joins
+
+"Another variant of a map-side join applies if the input datasets are not only partitioned in the same way, but also sorted based on the same key."
+
+MapReduce workflows with map-side joins
+
+"Knowing about the physical layout of datasets in the distributed filesystem becomes important when optimizing join strategies: it is not sufficient to just know the encoding format and the name of the directory in which the data is stored; you must also know the number of partitions and the keys by which the data is partitioned and sorted."
+
+The Output of Batch Workflows
+
+"It is not transaction processing, nor is it analytics."
+
+Building search indexes
+
+"Google’s original use of MapReduce was to build indexes for its search engine, which was implemented as a workflow of 5 to 10 MapReduce jobs."
+
+"Although Google later moved away from using MapReduce for this purpose, it helps to understand MapReduce if you look at it through the lens of building a search index."
+
+"If you need to perform a full-text search over a fixed set of documents, then a batch process is a very effective way of building the indexes: the mappers partition the set of documents as needed, each reducer builds the index for its partition, and the index files are written to the distributed filesystem."
+
+Key-value stores as batch process output
+
+"Another common use for batch processing is to build machine learning systems such as classifiers (e.g., spam filters, anomaly detection, image recognition) and recommendation systems (e.g., people you may know, products you may be interested in, or related searches)."
+
+"A much better solution is to build a brand-new database inside the batch job and write it as files to the job’s output directory in the distributed filesystem, just like the search indexes in the last section."
+
+Philosophy of batch process outputs
+
+"In these areas, the design principles that worked well for Unix also seem to be work‐ ing well for Hadoop — but Unix and Hadoop also differ in some ways."
+
+Comparing Hadoop to Distributed Databases
+
+"The biggest difference is that MPP databases focus on parallel execution of analytic SQL queries on a cluster of machines, while the combination of MapReduce and a distributed filesystem provides something much more like a general-purpose operating system that can run arbitrary programs."
+
+Diversity of storage
+
+"Indiscriminate data dumping shifts the burden of interpreting the data: instead of forcing the producer of a dataset to bring it into a standardized format, the interpretation of the data becomes the consumer’s problem."
+
+Diversity of processing models
+
+"If you have HDFS and MapReduce, you can build a SQL query execution engine on top of it, and indeed this is what the Hive project did."
+
+"However, you can also write many other forms of batch processes that do not lend themselves to being expressed as a SQL query."
+
+"Crucially, those various processing models can all be run on a single shared-use cluster of machines, all accessing the same files on the distributed filesystem."
+
+Designing for frequent faults
+
+"At Google, a MapReduce task that runs for an hour has an approximately 5% risk of being terminated to make space for a higher-priority process."
+
+"This rate is more than an order of magnitude higher than the rate of failures due to hardware issues, machine reboot, or other reasons."
+
+"At this rate of preemptions, if a job has 100 tasks that each run for 10 minutes, there is a risk greater than 50% that at least one task will be terminated before it is finished."
+
+"And this is why MapReduce is designed to tolerate frequent unexpected task termination: it’s not because the hardware is particularly unreliable, it’s because the freedom to arbitrarily terminate processes enables better resource utilization in a computing cluster."
+
+Beyond MapReduce
+
+"Quite the opposite: implementing a complex processing job using the raw MapReduce APIs is actually quite hard and laborious — for instance, you would need to implement any join algorithms from scratch."
+
+"In response to the difficulty of using MapReduce directly, various higher-level programming models (Pig, Hive, Cascading, Crunch) were created as abstractions on top of MapReduce."
+
+"If you understand how MapReduce works, they are fairly easy to learn, and their higher-level constructs make many common batch processing tasks significantly easier to implement."
+
+Materialization of Intermediate State
+
+"In this case, the files on the distributed filesystem are simply intermediate state: a means of passing data from one job to the next."
+
+"The process of writing out this intermediate state to files is called materialization."
+
+"Pipes do not fully materialize the intermediate state, but instead stream the output to the input incrementally, using only a small in-memory buffer."
+
+Dataflow engines
+
+"Since they explicitly model the flow of data through several processing stages, these systems are known as dataflow engines."
+
+Fault tolerance
+
+"An advantage of fully materializing intermediate state to a distributed filesystem is that it is durable, which makes fault tolerance fairly easy in MapReduce: if a task fails, it can just be restarted on another machine and read the same input again from the filesystem."
+
+"Spark, Flink, and Tez avoid writing intermediate state to HDFS, so they take a different approach to tolerating faults: if a machine fails and the intermediate state on that machine is lost, it is recomputed from other data that is still available (a prior intermediary stage if possible, or otherwise the original input data, which is normally on HDFS)."
+
+"To enable this recomputation, the framework must keep track of how a given piece of data was computed — which input partitions it used, and which operators were applied to it."
+
+"When recomputing data, it is important to know whether the computation is deterministic: that is, given the same input data, do the operators always produce the same output?"
+
+Discussion of materialization
+
+"Flink especially is built around the idea of pipelined execution: that is, incrementally passing the output of an operator to other operators, and not waiting for the input to be complete before starting to process it."
+
+Graphs and Iterative Processing
+
+"Many graph algorithms are expressed by traversing one edge at a time, joining one vertex with an adjacent vertex in order to propagate some information, and repeating until some condition is met — for example, until there are no more edges to follow, or until some metric converges."
+
+"This approach works, but implementing it with MapReduce is often very inefficient, because MapReduce does not account for the iterative nature of the algorithm: it will always read the entire input dataset and produce a completely new output dataset, even if only a small part of the graph has changed compared to the last iteration."
+
+The Pregel processing model
+
+"In each iteration, a function is called for each vertex, passing it all the messages that were sent to it — much like a call to the reducer."
+
+"It’s a bit similar to the actor model, if you think of each vertex as an actor, except that vertex state and messages between vertices are fault-tolerant and durable, and communication proceeds in fixed rounds: at every iteration, the framework delivers all messages sent in the previous iteration."
+
+Fault tolerance
+
+"This fault tolerance is achieved by periodically checkpointing the state of all vertices at the end of an iteration — i.e., writing their full state to durable storage."
+
+Parallel execution
+
+"Because the programming model deals with just one vertex at a time (sometimes called “thinking like a vertex”), the framework may partition the graph in arbitrary ways."
+
+High-Level APIs and Languages
+
+"These dataflow APIs generally use relational-style building blocks to express a computation: joining datasets on the value of some field; grouping tuples by key; filtering by some condition; and aggregating tuples by counting, summing, or other functions."
+
+The move toward declarative query languages
+
+"By incorporating declarative aspects in their high-level APIs, and having query optimizers that can take advantage of them during execution, batch processing frame‐ works begin to look more like MPP databases (and can achieve comparable performance)."
+
+"At the same time, by having the extensibility of being able to run arbitrary code and read data in arbitrary formats, they retain their flexibility advantage."
+
+Specialization for different domains
+
+"As batch processing systems gain built-in functionality and high-level declarative operators, and as MPP databases become more programmable and flexible, the two are beginning to look more alike: in the end, they are all just systems for storing and processing data."
+
+Summary
+
+"In the Unix world, the uniform interface that allows one program to be composed with another is files and pipes; in MapReduce, that interface is a distributed filesystem."
+
+"The output of mappers is repartitioned, sorted, and merged into a configurable number of reducer partitions."
+
+"Dataflow engines perform less materialization of intermediate state and keep more in memory, which means that they need to recompute more data if a node fails."
+
+"By partitioning, sorting, and merging, all the records with the same key end up going to the same call of the reducer."
+
+"One of the two join inputs is small, so it is not partitioned and it can be entirely loaded into a hash table."
+
+"If the two join inputs are partitioned in the same way (using the same key, same hash function, and same number of partitions), then the hash table approach can be used independently for each partition."
+
+"Thanks to the framework, your code in a batch processing job does not need to worry about implementing fault-tolerance mechanisms: the framework can guarantee that the final output of a job is the same as if no faults had occurred, even though in reality various tasks perhaps had to be retried."
+
+"The distinguishing feature of a batch processing job is that it reads some input data and produces some output data, without modifying the input — in other words, the output is derived from the input."
+
+"Crucially, the input data is bounded: it has a known, fixed size (for example, it consists of a set of log files at some point in time, or a snapshot of a database’s contents)."
+
+"Because it is bounded, a job knows when it has finished reading the entire input, and so a job eventually completes when it is done."
+
+### 11 Stream Processing
+
