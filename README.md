@@ -2976,3 +2976,362 @@ Table-table joins
 
 ### 12 The Future of Data Systems
 
+"Our goal is to discover how to design applications that are better than the ones of today — robust, correct, evolvable, and ultimately beneficial to humanity."
+
+Data Integration
+
+"Every piece of software, even a so-called “general-purpose” database, is designed for a particular usage pattern."
+
+Combining Specialized Tools by Deriving Data
+
+"The need for data integration often only becomes apparent if you zoom out and consider the dataflows across an entire organization."
+
+
+Reasoning about dataflows
+
+"When copies of the same data need to be maintained in several storage systems in order to satisfy different access patterns, you need to be very clear about the inputs and outputs: where is data written first, and which representations are derived from which sources?"
+
+"How do you get data into all the right places, in the right formats?"
+
+Derived data versus distributed transactions
+
+"In the absence of widespread support for a good distributed transaction protocol, I believe that log-based derived data is the most promising approach for integrating different data systems."
+
+The limits of total ordering
+
+"In most cases, constructing a totally ordered log requires all events to pass through a single leader node that decides on the ordering."
+
+"It is still an open research problem to design consensus algorithms that can scale beyond the throughput of a single node and that work well in a geographically distributed setting."
+
+Ordering events to capture causality
+
+"However, in a system that stores friendship status in one place and messages in another place, that ordering dependency between the unfriend event and the message- send event may be lost."
+
+"If the causal dependency is not captured, a service that sends notifications about new messages may process the message-send event before the unfriend event, and thus incorrectly send a notification to the ex-partner."
+
+Batch and Stream Processing
+
+"I would say that the goal of data integration is to make sure that data ends up in the right form in all the right places."
+
+"Doing so requires consuming inputs, transforming, joining, filtering, aggregating, training models, evaluating, and eventually writing to the appropriate outputs."
+
+"Batch and stream processors are the tools for achieving this goal."
+
+"Spark performs stream processing on top of a batch processing engine by breaking the stream into microbatches, whereas Apache Flink performs batch processing on top of a stream processing engine."
+
+"In principle, one type of processing can be emulated on top of the other, although the performance characteristics vary: for example, microbatching may perform poorly on hopping or sliding windows."
+
+Maintaining derived state
+
+"Batch processing has a quite strong functional flavor (even if the code is not written in a functional programming language): it encourages deterministic, pure functions whose output depends only on the input and which have no side effects other than the explicit outputs, treating inputs as immutable and outputs as append-only."
+
+Reprocessing data for application evolution
+
+"Stream processing allows changes in the input to be reflected in derived views with low delay, whereas batch processing allows large amounts of accumulated historical data to be reprocessed in order to derive new views onto an existing dataset."
+
+Schema Migrations on Railways
+
+"This conversion can be done gradually, and when it is done, trains of both gauges can run on the line, using two of the three rails."
+
+"The beauty of such a gradual migration is that every stage of the process is easily reversible if something goes wrong: you always have a working system to go back to."
+
+The lambda architecture
+
+"The core idea of the lambda architecture is that incoming data should be recorded by appending immutable events to an always-growing dataset, similarly to event sourcing."
+
+"In the lambda approach, the stream processor consumes the events and quickly produces an approximate update to the view; the batch processor later consumes the same set of events and produces a corrected version of the derived view."
+
+"Having to maintain the same logic to run both in a batch and in a stream processing framework is significant additional effort."
+
+Unifying batch and stream processing
+
+"For example, log-based message brokers have the ability to replay messages, and some stream processors can read input from a distributed filesystem like HDFS."
+
+Unbundling Databases
+
+"Unix and relational databases have approached the information management problem with very different philosophies."
+
+"Unix viewed its purpose as presenting programmers with a logical but fairly low-level hardware abstraction, whereas relational databases wanted to give application programmers a high-level abstraction that would hide the complexities of data structures on disk, concurrency, crash recovery, and so on."
+
+"Unix developed pipes and files that are just sequences of bytes, whereas databases developed SQL and transactions."
+
+Composing Data Storage Technologies
+
+"It seems that there are parallels between the features that are built into databases and the derived data systems that people are building with batch and stream processors."
+
+Creating an index
+
+"The database has to scan over a consistent snapshot of a table, pick out all of the field values being indexed, sort them, and write out the index."
+
+The meta-database of everything
+
+"Whenever a batch, stream, or ETL process transports data from one place and form to another place and form, it is acting like the database subsystem that keeps indexes or materialized views up to date."
+
+Federated databases: unifying reads
+
+"It is possible to provide a unified query interface to a wide variety of underlying storage engines and processing methods — an approach known as a federated database or polystore."
+
+Unbundled databases: unifying writes
+
+"Making it easier to reliably plug together storage systems (e.g., through change data capture and event logs) is like unbundling a database’s index-maintenance features in a way that can synchronize writes across disparate technologies."
+
+Making unbundling work
+
+"Federation and unbundling are two sides of the same coin: composing a reliable, scalable, and maintainable system out of diverse components."
+
+Unbundled versus integrated systems
+
+"The complexity of running several different pieces of infrastructure can be a problem: each piece of software has a learning curve, configuration issues, and operational quirks, and so it is worth deploying as few moving parts as possible."
+
+"Thus, if there is a single technology that does everything you need, you’re most likely best off simply using that product rather than trying to reimplement it yourself from lower-level components."
+
+"The advantages of unbundling and composition only come into the picture when there is no single piece of software that satisfies all your requirements."
+
+What’s missing?
+
+"The tools for composing data systems are getting better, but I think one major part is missing: we don’t yet have the unbundled-database equivalent of the Unix shell (i.e., a high-level language for composing storage and processing systems in a simple and declarative way)."
+
+"For example, I would love it if we could simply declare `mysql | elasticsearch`, by analogy to Unix pipes, which would be the unbundled equivalent of `CREATE INDEX`: it would take all the documents in a MySQL database and index them in an Elasticsearch cluster."
+
+Designing Applications Around Dataflow
+
+"Even spreadsheets have dataflow programming capabilities that are miles ahead of most mainstream programming languages."
+
+"In a spreadsheet, you can put a formula in one cell (for example, the sum of cells in another column), and whenever any input to the formula changes, the result of the formula is automatically recalculated."
+
+"This is exactly what we want at a data system level: when a record in a database changes, we want any index for that record to be automatically updated, and any cached views or aggregations that depend on the record to be automatically refreshed."
+
+"You should not have to worry about the technical details of how this refresh happens, but be able to simply trust that it works correctly."
+
+Application code as a derivation function
+
+"When the function that creates a derived dataset is not a standard cookie-cutter function like creating a secondary index, custom code is required to handle the application-specific aspects."
+
+Separation of application code and state
+
+"The trend has been to keep stateless application logic separate from state management (databases): not putting application logic in the database and not putting persistent state in the application."
+
+"As people in the functional programming community like to joke, “We believe in the separation of Church and state”."
+
+Dataflow: Interplay between state changes and application code
+
+"Stable message ordering and fault-tolerant message processing are quite stringent demands, but they are much less expensive and more operationally robust than distributed transactions."
+
+Stream processors and services
+
+"Subscribing to a stream of changes, rather than querying the current state when needed, brings us closer to a spreadsheet-like model of computation: when some piece of data changes, any derived data that depends on it can swiftly be updated."
+
+Observing Derived State
+
+"Taken together, the write path and the read path encompass the whole journey of the data, from the point where it is collected to the point where it is consumed (probably by another human)."
+
+"If you are familiar with functional programming languages, you might notice that the write path is similar to eager evaluation, and the read path is similar to lazy evaluation."
+
+Materialized views and caching
+
+"If you didn’t have an index, a search query would have to scan over all documents (like grep), which would get very expensive if you had a large number of documents."
+
+"No index means less work on the write path (no index to update), but a lot more work on the read path."
+
+Stateful, offline-capable clients
+
+"These changing capabilities have led to a renewed interest in offline-first applications that do as much as possible using a local database on the same device, without requiring an internet connection, and sync with remote servers in the background when a network connection is available."
+
+Pushing state changes to clients
+
+"More recent protocols have moved beyond the basic request/response pattern of HTTP: server-sent events (the EventSource API) and WebSockets provide communication channels by which a web browser can keep an open TCP connection to a server, and the server can actively push messages to the browser as long as it remains connected."
+
+End-to-end event streams
+
+"In order to extend the write path all the way to the end user, we would need to fundamentally rethink the way we build many of these systems: moving away from request/ response interaction and toward publish/subscribe dataflow."
+
+Reads are events too
+
+"When both the writes and the reads are represented as events, and routed to the same stream operator in order to be handled, we are in fact performing a stream-table join between the stream of read queries and the database."
+
+"A one-off read request just passes the request through the join operator and then immediately forgets it; a subscribe request is a persistent join with past and future events on the other side of the join."
+
+Multi-partition data processing
+
+"Another example of this pattern occurs in fraud prevention: in order to assess the risk of whether a particular purchase event is fraudulent, you can examine the reputation scores of the user’s IP address, email address, billing address, shipping address, and so on."
+
+Aiming for Correctness
+
+"On the other hand, if you need stronger assurances of correctness, then serializability and atomic commit are established approaches, but they come at a cost: they typically only work in a single datacenter (ruling out geographically distributed architectures), and they limit the scale and fault-tolerance properties you can achieve."
+
+The End-to-End Argument for Databases
+
+"Just because an application uses a data system that provides comparatively strong safety properties, such as serializable transactions, that does not mean the application is guaranteed to be free from data loss or corruption."
+
+Exactly-once execution of an operation
+
+"However, taking an operation that is not naturally idempotent and making it idempotent requires some effort and care: you may need to maintain some additional metadata (such as the set of operation IDs that have updated a value), and ensure fencing when failing over from one node to another."
+
+Duplicate suppression
+
+"Even if we can suppress duplicate transactions between the database client and server, we still need to worry about the network between the end-user device and the application server."
+
+Operation identifiers
+
+"To make the operation idempotent through several hops of network communication, it is not sufficient to rely just on a transaction mechanism provided by a database — you need to consider the end-to-end flow of the request."
+
+The end-to-end argument
+
+"Solving the problem requires an end-to-end solution: a transaction identifier that is passed all the way from the end-user client to the database."
+
+Applying end-to-end thinking in data systems
+
+"As numerous examples throughout this book have shown, reasoning about concurrency and partial failure is difficult and counterintuitive, and so I suspect that most application-level mechanisms do not work correctly."
+
+Enforcing Constraints
+
+"Other kinds of constraints are very similar: for example, ensuring that an account balance never goes negative, that you don’t sell more items than you have in stock in the warehouse, or that a meeting room does not have overlapping bookings."
+
+Uniqueness constraints require consensus
+
+"Uniqueness checking can be scaled out by partitioning based on the value that needs to be unique."
+
+Uniqueness in log-based messaging
+
+"Thus, if the log is partitioned based on the value that needs to be unique, a stream processor can unambiguously and deterministically decide which one of several conflicting operations came first."
+
+Multi-partition request processing
+
+"In the traditional approach to databases, executing this transaction would require an atomic commit across all three partitions, which essentially forces it into a total order with respect to all other transactions on any of those partitions."
+
+"By breaking down the multi-partition transaction into two differently partitioned stages and using the end-to-end request ID, we have achieved the same correctness property (every request is applied exactly once to both the payer and payee accounts), even in the presence of faults, and without using an atomic commit protocol."
+
+Timeliness and Integrity
+
+"Timeliness means ensuring that users observe the system in an up-to-date state."
+
+"Integrity means absence of corruption; i.e., no data loss, and no contradictory or false data."
+
+"In slogan form: violations of timeliness are “eventual consistency,” whereas violations of integrity are “perpetual inconsistency.”"
+
+Correctness of dataflow systems
+
+"Thus, if you approach application correctness from the point of view of ACID transactions, the distinction between timeliness and integrity is fairly inconsequential."
+
+"Exactly-once or effectively-once semantics is a mechanism for preserving integrity."
+
+Loosely interpreted constraints
+
+"In many business contexts, it is actually acceptable to temporarily violate a constraint and fix it up later by apologizing."
+
+Coordination-avoiding data systems
+
+"Dataflow systems can maintain integrity guarantees on derived data without atomic commit, linearizability, or synchronous cross-partition coordination."
+
+"Although strict uniqueness constraints require timeliness and coordination, many applications are actually fine with loose constraints that may be temporarily violated and fixed up later, as long as integrity is preserved throughout."
+
+"Another way of looking at coordination and constraints: they reduce the number of apologies you have to make due to inconsistencies, but potentially also reduce the performance and availability of your system, and thus potentially increase the number of apologies you have to make due to outages."
+
+Trust, but Verify
+
+"The question is whether violations of our assumptions happen often enough that we may encounter them in practice."
+
+Maintaining integrity in the face of software bugs
+
+"Many applications don’t even correctly use the features that databases offer for preserving integrity, such as foreign key or uniqueness constraints."
+
+Don’t just blindly trust what they promise
+
+"For example, large-scale storage systems such as HDFS and Amazon S3 do not fully trust disks: they run background processes that continually read back files, compare them to other replicas, and move files from one disk to another, in order to mitigate the risk of silent corruption."
+
+A culture of verification
+
+"I fear that the culture of ACID databases has led us toward developing applications on the basis of blindly trusting technology (such as a transaction mechanism), and neglecting any sort of auditability in the process."
+
+Designing for auditability
+
+"Being explicit about dataflow makes the provenance of data much clearer, which makes integrity checking much more feasible."
+
+"For the event log, we can use hashes to check that the event storage has not been corrupted."
+
+"For any derived state, we can rerun the batch and stream processors that derived it from the event log in order to check whether we get the same result, or even run a redundant derivation in parallel."
+
+The end-to-end argument again
+
+"Like automated testing, auditing increases the chances that bugs will be found quickly, and thus reduces the risk that a change to the system or a new storage technology will cause damage."
+
+Tools for auditable data systems
+
+"At present, not many data systems make auditability a top-level concern."
+
+Doing the Right Thing
+
+"Every system is built for a purpose; every action we take has both intended and unintended consequences."
+
+Predictive Analytics
+
+"In countries that respect human rights, the criminal justice system presumes innocence until proven guilty; on the other hand, automated systems can systematically and arbitrarily exclude a person from participating in society without any proof of guilt, and with little chance of appeal."
+
+Bias and discrimination
+
+"Predictive analytics systems merely extrapolate from the past; if the past is discriminatory, they codify that discrimination."
+
+Responsibility and accountability
+
+"Much data is statistical in nature, which means that even if the probability distribution on the whole is correct, individual cases may well be wrong."
+
+Feedback loops
+
+"However, many consequences can be predicted by thinking about the entire system (not just the computerized parts, but also the people interacting with it) — an approach known as systems thinking."
+
+Privacy and Tracking
+
+"When a system only stores data that a user has explicitly entered, because they want the system to store and process it in a certain way, the system is performing a service for the user: the user is the customer."
+
+"But when a user’s activity is tracked and logged as a side effect of other things they are doing, the relationship is less clear."
+
+Surveillance
+
+"As a thought experiment, try replacing the word data with surveillance, and observe if common phrases still sound so good."
+
+Consent and freedom of choice
+
+"We might assert that users voluntarily choose to use a service that tracks their activity, and they have agreed to the terms of service and privacy policy, so they consent to data collection."
+
+"Declining to use a service due to its tracking of users is only an option for the small number of people who are privileged enough to have the time and knowledge to understand its privacy policy, and who can afford to potentially miss out on social participation or professional opportunities that may have arisen if they had participated in the service."
+
+Privacy and use of data
+
+"Having privacy does not mean keeping everything secret; it means having the freedom to choose which things to reveal to whom, what to make public, and what to keep secret."
+
+Data as assets and power
+
+"When collecting data, we need to consider not just today’s political environment, but all possible future governments."
+
+Remembering the Industrial Revolution
+
+"Just as the Industrial Revolution had a dark side that needed to be managed, our transition to the information age has major problems that we need to confront and solve."
+
+Legislation and self-regulation
+
+"However, it is doubtful whether this legislation is effective in today’s internet context."
+
+"Fundamentally, I think we need a culture shift in the tech industry with regard to personal data."
+
+"We should stop regarding users as metrics to be optimized, and remember that they are humans who deserve respect, dignity, and agency."
+
+"We should self-regulate our data collection and processing practices in order to establish and maintain the trust of the people who depend on our software." 
+
+"And we should take it upon ourselves to educate end users about how their data is used, rather than keeping them in the dark."
+
+Summary
+
+"In this approach, certain systems are designated as systems of record, and other data is derived from them through transformations."
+
+"In this way we can maintain indexes, materialized views, machine learning models, statistical summaries, and more."
+
+"By structuring applications around dataflow and checking constraints asynchronously, we can avoid most coordination and create systems that maintain integrity but still perform well, even in geographically distributed scenarios and in the presence of faults."
+
+"We saw that although data can be used to do good, it can also do significant harm: making justifying decisions that seriously affect people’s lives and are difficult to appeal against, leading to discrimination and exploitation, normalizing surveillance, and exposing intimate information."
+
+"We also run the risk of data breaches, and we may find that a well-intentioned use of data has unintended consequences."
+
+"As software and data are having such a large impact on the world, we engineers must remember that we carry a responsibility to work toward the kind of world that we want to live in: a world that treats people with humanity and respect."
+
+"I hope that we can work together toward that goal."
+
